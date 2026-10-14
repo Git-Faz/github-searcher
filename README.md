@@ -6,6 +6,7 @@ Spring Boot REST API that searches GitHub repositories, saves results in Postgre
 
 - Java 25
 - Docker Compose (for local PostgreSQL)
+- Docker (optional, to build the deployment image locally)
 
 ## Run locally
 
@@ -26,9 +27,33 @@ export DB_PASSWORD=postgres
 
 Set `GITHUB_API_TOKEN` if you want to authenticate outbound GitHub API requests and raise the unauthenticated rate limit. The app uses `https://api.github.com` by default.
 
-The endpoints can be called from Postman or with curl.
+## Deploy to Render with Neon PostgreSQL
 
-Swagger UI is available at `http://localhost:8080/swagger-ui/index.html`. The OpenAPI JSON document is at `http://localhost:8080/v3/api-docs`.
+The repository includes a multi-stage `Dockerfile` and a `render.yaml` Blueprint. The image build runs `mvn package`, including the test suite, and the runtime container runs as a non-root user. `.dockerignore` excludes `.env` and local build files from the image.
+
+To deploy:
+
+1. Push this repository to GitHub or another Git provider connected to Render.
+2. In Render, create a new Blueprint from the repository and use the checked-in `render.yaml`.
+3. Set the requested `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` environment variables from Neon, then deploy.
+
+Use the Neon connection details to form the JDBC URL. For example, if Neon provides `postgresql://<user>:<password>@<neon-host>/<database>?sslmode=require`, set `DB_URL` to `jdbc:postgresql://<neon-host>/<database>?sslmode=require`, `DB_USERNAME` to the Neon role, and `DB_PASSWORD` to its password. For a pooled Neon connection, use its host and the exact user value Neon provides. The application runs `schema.sql` at startup, so the database role must be allowed to create the table.
+
+Render supplies `PORT` automatically; Spring Boot uses it when present and falls back to port 8080 locally. The Blueprint health check uses `/swagger-ui/index.html`. You can optionally set `GITHUB_API_TOKEN` in the Render service environment to authenticate GitHub API calls.
+
+After deployment, open `https://<render-service>.onrender.com/swagger-ui/index.html` to access Swagger, or append `/v3/api-docs` for the OpenAPI document. The free Render web service may spin down when idle and take time to respond to its next request.
+
+Keep database credentials in Render's environment settings; do not commit them to the repository.
+
+To build the image locally before pushing:
+
+```bash
+docker build -t github-searcher .
+```
+
+## Swagger and API examples
+
+The endpoints can be called from Postman or curl. Locally, Swagger UI is at `http://localhost:8080/swagger-ui/index.html` and OpenAPI JSON is at `http://localhost:8080/v3/api-docs`.
 
 ## API
 
